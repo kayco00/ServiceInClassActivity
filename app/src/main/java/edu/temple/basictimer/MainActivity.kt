@@ -4,24 +4,26 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.ServiceConnection
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.IBinder
 import android.widget.Button
 import android.widget.TextView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
 
-    val broadcastReceiver = object : BroadcastReceiver(){
-        override fun onReceive(context: Context?, intent: Intent?) {
-        }
-
-    }
-    val displayTextView : TextView by lazy {
-        findViewById<TextView>(R.id.textView)
+    val TextView : TextView by lazy {
+        findViewById(R.id.textView)
     }
     var timerBinder : TimerService.TimerBinder? = null
+
+
     val serviceConnection = object: ServiceConnection {
         override fun onServiceConnected(
             name: ComponentName?,
@@ -39,6 +41,16 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        lifecycleScope.launch{
+            repeatOnLifecycle(Lifecycle.State.RESUMED){
+                TimerInfo.currentTime.collect{
+                    TextView.text = it.toString()
+                }
+            }
+
+        }
+
+
         bindService(
             Intent(this, TimerService::class.java),
             serviceConnection,
@@ -46,14 +58,24 @@ class MainActivity : AppCompatActivity() {
         )
 
         findViewById<Button>(R.id.startButton).setOnClickListener {
-          timerBinder?.start(100)
-            if(timerBinder?.isRunning == true){
-
-            }
+                timerBinder?.run {
+                    if(!isRunning){
+                        timerBinder?.start(100)
+                        (it as Button).text = "Pause"
+                    } else {
+                        timerBinder?.pause()
+                        (it as Button).text = if (isPaused) {
+                                "Resume"
+                            } else {
+                                "Pause"
+                            }
+                    }
+                }
         }
         
         findViewById<Button>(R.id.stopButton).setOnClickListener {
         timerBinder?.stop()
+            findViewById<Button>(R.id.startButton).text = "Start"
         }
     }
 
